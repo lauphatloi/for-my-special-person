@@ -3,263 +3,295 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>For You</title>
+    <title>My Universe</title>
     <style>
-        /* RESET & CORE STYLES */
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
             background-color: #000;
             color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow-x: hidden;
-            overscroll-behavior: none;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        /* CANVAS BACKGROUND (The Galaxy) */
-        #galaxy-canvas {
+        /* The 3D Canvas fixed in background */
+        .webgl {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
+            width: 100vw;
             height: 100vh;
             z-index: 1;
+            outline: none;
         }
 
-        /* SCROLL SECTIONS */
-        .content-container {
+        /* Scrollable Content Overlay */
+        .content {
             position: relative;
-            z-index: 10;
+            z-index: 2;
+            height: 300vh; /* Make page long enough to scroll */
         }
 
-        section {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            perspective: 1000px; /* For 3D effects */
-        }
-
-        /* SECTION 1: HIDDEN (Just to allow scroll space) */
-        .spacer { height: 100vh; }
-
-        /* SECTION 2: THE MESSAGE CARD */
-        .message-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 40px 30px;
-            border-radius: 24px;
-            text-align: center;
-            max-width: 90%;
-            width: 350px;
-            opacity: 0;
-            transform: translateY(50px) rotateX(10deg);
-            transition: all 1s cubic-bezier(0.2, 0.8, 0.2, 1);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        }
-
-        .message-card.visible {
-            opacity: 1;
-            transform: translateY(0) rotateX(0deg);
-        }
-
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 15px;
-            background: linear-gradient(45deg, #ff9a9e, #fad0c4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        p {
-            font-size: 1.1rem;
-            line-height: 1.6;
-            color: rgba(255,255,255,0.8);
-        }
-
-        /* SCROLL INDICATOR */
-        .scroll-hint {
+        .scroll-prompt {
             position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            font-size: 0.8rem;
-            opacity: 0.7;
+            bottom: 50px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
             animation: bounce 2s infinite;
-            z-index: 20;
             pointer-events: none;
         }
 
+        .final-message {
+            position: absolute;
+            top: 220vh; /* Appears at end of scroll */
+            width: 100%;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 1s ease;
+            pointer-events: none;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 20px;
+            display: inline-block;
+            max-width: 80%;
+            border: 1px solid rgba(255,255,255,0.2);
+            text-shadow: 0 2px 10px black;
+        }
+
+        h1 { font-size: 2rem; margin-bottom: 10px; color: #ff6030; }
+        p { font-size: 1.2rem; line-height: 1.5; }
+
         @keyframes bounce {
-            0%, 100% { transform: translate(-50%, 0); }
-            50% { transform: translate(-50%, 10px); }
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(10px); }
         }
     </style>
 </head>
 <body>
 
-    <!-- THE GALAXY BACKGROUND -->
-    <canvas id="galaxy-canvas"></canvas>
+    <canvas class="webgl"></canvas>
 
-    <!-- CONTENT OVERLAY -->
-    <div class="content-container">
-        
-        <!-- SECTION 1: The Visual Hook -->
-        <section id="hero">
-            <div class="scroll-hint">Scroll to reveal</div>
-        </section>
-
-        <!-- SECTION 2: The Message -->
-        <section id="message">
-            <div class="message-card">
-                <h1>My Universe</h1>
-                <p>
-                    Just like these stars, my world revolves around you. 
-                    <br><br>
-                    You are my Scorpio spark in the infinite dark.
-                </p>
+    <div class="content">
+        <div class="scroll-prompt">Scroll to explore</div>
+        <div class="final-message" id="msg">
+            <div class="card">
+                <h1>For You</h1>
+                <p>You are the brightest constellation in my galaxy.</p>
             </div>
-        </section>
-
+        </div>
     </div>
 
-    <script>
-        /** 
-         * PART 1: THE GALAXY & SCORPIO ENGINE 
-         * Optimised for iPhone 15 GPU
-         */
-        const canvas = document.getElementById('galaxy-canvas');
-        const ctx = canvas.getContext('2d');
-        
-        let width, height;
-        let particles = [];
-        
-        // Colors extracted from your image (Oranges, Purples, Blues)
-        const colors = ['#FF5F1F', '#FFC0CB', '#8A2BE2', '#FFFFFF', '#4169E1', '#FF4500'];
+    <!-- Import Map for Three.js modules -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.skypack.dev/three@0.132.2"
+            }
+        }
+    </script>
 
-        // SCORPIO CONSTELLATION MAPPING (Relative percentages of screen)
-        // This forms a rough "S" shape with a tail
-        const scorpioPoints = [
-            {x: 0.7, y: 0.2}, {x: 0.65, y: 0.25}, {x: 0.6, y: 0.3}, // Claws
-            {x: 0.5, y: 0.4}, {x: 0.45, y: 0.5}, {x: 0.45, y: 0.6}, // Body
-            {x: 0.5, y: 0.7}, {x: 0.6, y: 0.75}, {x: 0.7, y: 0.7},  // Tail curve
-            {x: 0.75, y: 0.6}, {x: 0.8, y: 0.55} // Stinger
+    <script type="module">
+        import * as THREE from 'three';
+
+        // 1. SETUP
+        const canvas = document.querySelector('canvas.webgl');
+        const scene = new THREE.Scene();
+
+        // 2. CONFIGURATION
+        const parameters = {
+            count: 30000,          // Total stars (Keep reasonable for mobile)
+            size: 0.15,            // Size of the image squares
+            radius: 5,             // Size of galaxy
+            branches: 3,
+            spin: 1,
+            randomness: 0.5,
+            randomnessPower: 3,
+            insideColor: '#ff6030', // Scorpio/Core Color
+            outsideColor: '#1b3984' // Galaxy Arms Color
+        };
+
+        // 3. TEXTURE LOADER (YOUR IMAGE GOES HERE)
+        const textureLoader = new THREE.TextureLoader();
+        // ★★★ REPLACE THIS URL WITH YOUR IMAGE LINK ★★★
+        // Use a square image for best results.
+        const particleTexture = textureLoader.load('https://assets.codepen.io/16327/logo_1.png'); 
+
+        // 4. SCORPIO CONSTELLATION DATA
+        // I mapped these manually to look like the Scorpio shape in 3D space
+        const scorpioStars = [
+            new THREE.Vector3(0.5, 1.5, 0),    // Head 1
+            new THREE.Vector3(0.2, 1.3, 0),    // Head 2
+            new THREE.Vector3(-0.1, 1.1, 0),   // Head 3
+            new THREE.Vector3(-0.3, 0.8, 0),   // Body Start
+            new THREE.Vector3(-0.4, 0.4, 0),   // Body
+            new THREE.Vector3(-0.4, 0.0, 0),   // Body
+            new THREE.Vector3(-0.3, -0.4, 0),  // Body Curve
+            new THREE.Vector3(0.0, -0.7, 0),   // Tail Start
+            new THREE.Vector3(0.4, -0.8, 0),   // Tail Bottom
+            new THREE.Vector3(0.7, -0.6, 0),   // Tail Up
+            new THREE.Vector3(0.8, -0.3, 0),   // Stinger Base
+            new THREE.Vector3(0.9, -0.1, 0)    // Stinger Tip
         ];
 
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        let geometry = null;
+        let material = null;
+        let points = null;
 
-        class Particle {
-            constructor() {
-                this.reset();
-                // Randomize start position for the "Big Bang" effect
-                this.x = Math.random() * width;
-                this.y = Math.random() * height;
+        const generateGalaxy = () => {
+            if(points !== null) {
+                geometry.dispose();
+                material.dispose();
+                scene.remove(points);
             }
 
-            reset() {
-                this.size = Math.random() * 3 + 1; // Square size
-                this.color = colors[Math.floor(Math.random() * colors.length)];
-                this.speedX = (Math.random() - 0.5) * 0.5;
-                this.speedY = (Math.random() - 0.5) * 0.5;
-                
-                // Target: Either a random point (Galaxy) or a Constellation point
-                this.targetX = null;
-                this.targetY = null;
-                this.isConstellation = false;
-            }
+            geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(parameters.count * 3);
+            const colors = new Float32Array(parameters.count * 3);
 
-            update(scrollProgress) {
-                // STATE 1: GALAXY (When at top of page)
-                if (scrollProgress < 0.1) {
-                    // Slight drift
-                    this.x += this.speedX;
-                    this.y += this.speedY;
+            const colorInside = new THREE.Color(parameters.insideColor);
+            const colorOutside = new THREE.Color(parameters.outsideColor);
 
-                    // Wrap around screen
-                    if (this.x < 0) this.x = width;
-                    if (this.x > width) this.x = 0;
-                    if (this.y < 0) this.y = height;
-                    if (this.y > height) this.y = 0;
+            // Create the Galaxy
+            for(let i = 0; i < parameters.count; i++) {
+                const i3 = i * 3;
+
+                // --- SCORPIO LOGIC ---
+                // We dedicate the first 1500 particles to form the Scorpio shape nicely
+                const scorpioCount = 1500; 
+
+                if (i < scorpioCount) {
+                    // Pick a random star from the constellation array
+                    const starTarget = scorpioStars[Math.floor(Math.random() * scorpioStars.length)];
                     
-                    // Reset constellation target
-                    this.isConstellation = false;
-                } 
-                // STATE 2: FORM SCORPIO (When scrolling starts)
-                else {
-                    if (!this.isConstellation) {
-                        // Assign a target based on Scorpio points
-                        const pt = scorpioPoints[Math.floor(Math.random() * scorpioPoints.length)];
-                        // Add randomness so they clump around the star, not stack perfectly
-                        this.targetX = (pt.x * width) + (Math.random() - 0.5) * 50; 
-                        this.targetY = (pt.y * height) + (Math.random() - 0.5) * 50;
-                        this.isConstellation = true;
-                    }
+                    // Create a "cloud" around that star point so it glows
+                    const spread = 0.15; // How tight the star cluster is
+                    
+                    positions[i3]     = starTarget.x + (Math.random() - 0.5) * spread;
+                    positions[i3 + 1] = starTarget.y + (Math.random() - 0.5) * spread;
+                    positions[i3 + 2] = starTarget.z + (Math.random() - 0.5) * spread;
 
-                    // Move towards target (Lerp)
-                    this.x += (this.targetX - this.x) * 0.05;
-                    this.y += (this.targetY - this.y) * 0.05;
+                    // Color them bright orange/red
+                    colors[i3]     = colorInside.r + 0.2;
+                    colors[i3 + 1] = colorInside.g;
+                    colors[i3 + 2] = colorInside.b;
+
+                } else {
+                    // --- GALAXY VORTEX LOGIC (Rest of particles) ---
+                    const radius = Math.random() * parameters.radius;
+                    const spinAngle = radius * parameters.spin;
+                    const branchAngle = ((i % parameters.branches) / parameters.branches) * Math.PI * 2;
+
+                    const randomX = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1);
+                    const randomY = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1);
+                    const randomZ = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1);
+
+                    // Offset X and Z so the galaxy surrounds the Scorpio in the middle
+                    positions[i3]     = Math.cos(branchAngle + spinAngle) * radius + randomX;
+                    positions[i3 + 1] = randomY; // Keep galaxy relatively flat
+                    positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+
+                    // Mixed Colors
+                    const mixedColor = colorInside.clone();
+                    mixedColor.lerp(colorOutside, radius / parameters.radius);
+
+                    colors[i3]     = mixedColor.r;
+                    colors[i3 + 1] = mixedColor.g;
+                    colors[i3 + 2] = mixedColor.b;
                 }
             }
 
-            draw() {
-                ctx.fillStyle = this.color;
-                // Drawing tiny squares as requested
-                ctx.fillRect(this.x, this.y, this.size, this.size);
-            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            // Material using the IMAGE TEXTURE
+            material = new THREE.PointsMaterial({
+                size: parameters.size,
+                sizeAttenuation: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                vertexColors: true,
+                map: particleTexture, // <--- This applies your image
+                transparent: true,
+                alphaTest: 0.001
+            });
+
+            points = new THREE.Points(geometry, material);
+            scene.add(points);
         }
 
-        // Create 2000 Particles (Good balance for Mobile)
-        function init() {
-            particles = [];
-            for (let i = 0; i < 2000; i++) {
-                particles.push(new Particle());
+        generateGalaxy();
+
+        // 5. SIZES & RESIZE
+        const sizes = { width: window.innerWidth, height: window.innerHeight };
+
+        window.addEventListener('resize', () => {
+            sizes.width = window.innerWidth;
+            sizes.height = window.innerHeight;
+            camera.aspect = sizes.width / sizes.height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(sizes.width, sizes.height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        });
+
+        // 6. CAMERA
+        const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100);
+        camera.position.set(0, 0, 4); // Start further back
+        scene.add(camera);
+
+        // 7. RENDERER
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+        renderer.setSize(sizes.width, sizes.height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // 8. SCROLL ANIMATION LOGIC
+        let scrollY = 0;
+        window.addEventListener('scroll', () => {
+            scrollY = window.scrollY;
+            
+            // Show final message at bottom
+            const msg = document.getElementById('msg');
+            if (scrollY > window.innerHeight * 1.5) {
+                msg.style.opacity = 1;
+            } else {
+                msg.style.opacity = 0;
             }
-        }
-        init();
+        });
 
-        // ANIMATION LOOP
-        function animate() {
-            // Trail effect (fades previous frames slightly)
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
-            ctx.fillRect(0, 0, width, height);
+        // 9. ANIMATION LOOP
+        const clock = new THREE.Clock();
 
-            // Get scroll progress (0 to 1)
-            const scrollY = window.scrollY;
+        const tick = () => {
+            const elapsedTime = clock.getElapsedTime();
+
+            // --- AMAZING SCROLL EFFECT ---
+            // 1. Galaxy rotates slowly naturally
+            points.rotation.y = elapsedTime * 0.05;
+            
+            // 2. Scroll interaction:
+            // Calculate scroll percentage (0 to 1)
             const maxScroll = document.body.scrollHeight - window.innerHeight;
-            const progress = Math.min(scrollY / maxScroll, 1);
+            const scrollPercent = scrollY / maxScroll;
 
-            particles.forEach(p => {
-                p.update(progress);
-                p.draw();
-            });
+            // Camera moves closer to the Scorpio (Zoom In)
+            // Starts at Z=4, ends at Z=1.5
+            camera.position.z = 4 - (scrollPercent * 2.5);
+            
+            // Camera tilts slightly up to look at the constellation
+            camera.position.y = scrollPercent * 0.5;
 
-            requestAnimationFrame(animate);
+            // Constellation/Galaxy tilts to face user as they scroll
+            points.rotation.x = scrollPercent * 0.5;
+
+            renderer.render(scene, camera);
+            window.requestAnimationFrame(tick);
         }
-        animate();
 
-        /** 
-         * PART 2: SCROLL OBSERVER
-         * Triggers the card animation when in view
-         */
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.querySelector('.message-card').classList.add('visible');
-                }
-            });
-        }, { threshold: 0.5 });
-
-        observer.observe(document.getElementById('message'));
-
+        tick();
     </script>
 </body>
 </html>
