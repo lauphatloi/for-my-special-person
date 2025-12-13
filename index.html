@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>For You</title>
+    <style>
+        /* RESET & CORE STYLES */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #000;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            overscroll-behavior: none;
+        }
+
+        /* CANVAS BACKGROUND (The Galaxy) */
+        #galaxy-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* SCROLL SECTIONS */
+        .content-container {
+            position: relative;
+            z-index: 10;
+        }
+
+        section {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            perspective: 1000px; /* For 3D effects */
+        }
+
+        /* SECTION 1: HIDDEN (Just to allow scroll space) */
+        .spacer { height: 100vh; }
+
+        /* SECTION 2: THE MESSAGE CARD */
+        .message-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 40px 30px;
+            border-radius: 24px;
+            text-align: center;
+            max-width: 90%;
+            width: 350px;
+            opacity: 0;
+            transform: translateY(50px) rotateX(10deg);
+            transition: all 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .message-card.visible {
+            opacity: 1;
+            transform: translateY(0) rotateX(0deg);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(45deg, #ff9a9e, #fad0c4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: rgba(255,255,255,0.8);
+        }
+
+        /* SCROLL INDICATOR */
+        .scroll-hint {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 0.8rem;
+            opacity: 0.7;
+            animation: bounce 2s infinite;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, 0); }
+            50% { transform: translate(-50%, 10px); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- THE GALAXY BACKGROUND -->
+    <canvas id="galaxy-canvas"></canvas>
+
+    <!-- CONTENT OVERLAY -->
+    <div class="content-container">
+        
+        <!-- SECTION 1: The Visual Hook -->
+        <section id="hero">
+            <div class="scroll-hint">Scroll to reveal</div>
+        </section>
+
+        <!-- SECTION 2: The Message -->
+        <section id="message">
+            <div class="message-card">
+                <h1>My Universe</h1>
+                <p>
+                    Just like these stars, my world revolves around you. 
+                    <br><br>
+                    You are my Scorpio spark in the infinite dark.
+                </p>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        /** 
+         * PART 1: THE GALAXY & SCORPIO ENGINE 
+         * Optimised for iPhone 15 GPU
+         */
+        const canvas = document.getElementById('galaxy-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let particles = [];
+        
+        // Colors extracted from your image (Oranges, Purples, Blues)
+        const colors = ['#FF5F1F', '#FFC0CB', '#8A2BE2', '#FFFFFF', '#4169E1', '#FF4500'];
+
+        // SCORPIO CONSTELLATION MAPPING (Relative percentages of screen)
+        // This forms a rough "S" shape with a tail
+        const scorpioPoints = [
+            {x: 0.7, y: 0.2}, {x: 0.65, y: 0.25}, {x: 0.6, y: 0.3}, // Claws
+            {x: 0.5, y: 0.4}, {x: 0.45, y: 0.5}, {x: 0.45, y: 0.6}, // Body
+            {x: 0.5, y: 0.7}, {x: 0.6, y: 0.75}, {x: 0.7, y: 0.7},  // Tail curve
+            {x: 0.75, y: 0.6}, {x: 0.8, y: 0.55} // Stinger
+        ];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.reset();
+                // Randomize start position for the "Big Bang" effect
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+            }
+
+            reset() {
+                this.size = Math.random() * 3 + 1; // Square size
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.speedX = (Math.random() - 0.5) * 0.5;
+                this.speedY = (Math.random() - 0.5) * 0.5;
+                
+                // Target: Either a random point (Galaxy) or a Constellation point
+                this.targetX = null;
+                this.targetY = null;
+                this.isConstellation = false;
+            }
+
+            update(scrollProgress) {
+                // STATE 1: GALAXY (When at top of page)
+                if (scrollProgress < 0.1) {
+                    // Slight drift
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+
+                    // Wrap around screen
+                    if (this.x < 0) this.x = width;
+                    if (this.x > width) this.x = 0;
+                    if (this.y < 0) this.y = height;
+                    if (this.y > height) this.y = 0;
+                    
+                    // Reset constellation target
+                    this.isConstellation = false;
+                } 
+                // STATE 2: FORM SCORPIO (When scrolling starts)
+                else {
+                    if (!this.isConstellation) {
+                        // Assign a target based on Scorpio points
+                        const pt = scorpioPoints[Math.floor(Math.random() * scorpioPoints.length)];
+                        // Add randomness so they clump around the star, not stack perfectly
+                        this.targetX = (pt.x * width) + (Math.random() - 0.5) * 50; 
+                        this.targetY = (pt.y * height) + (Math.random() - 0.5) * 50;
+                        this.isConstellation = true;
+                    }
+
+                    // Move towards target (Lerp)
+                    this.x += (this.targetX - this.x) * 0.05;
+                    this.y += (this.targetY - this.y) * 0.05;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                // Drawing tiny squares as requested
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+            }
+        }
+
+        // Create 2000 Particles (Good balance for Mobile)
+        function init() {
+            particles = [];
+            for (let i = 0; i < 2000; i++) {
+                particles.push(new Particle());
+            }
+        }
+        init();
+
+        // ANIMATION LOOP
+        function animate() {
+            // Trail effect (fades previous frames slightly)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
+            ctx.fillRect(0, 0, width, height);
+
+            // Get scroll progress (0 to 1)
+            const scrollY = window.scrollY;
+            const maxScroll = document.body.scrollHeight - window.innerHeight;
+            const progress = Math.min(scrollY / maxScroll, 1);
+
+            particles.forEach(p => {
+                p.update(progress);
+                p.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        /** 
+         * PART 2: SCROLL OBSERVER
+         * Triggers the card animation when in view
+         */
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.querySelector('.message-card').classList.add('visible');
+                }
+            });
+        }, { threshold: 0.5 });
+
+        observer.observe(document.getElementById('message'));
+
+    </script>
+</body>
+</html>
