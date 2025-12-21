@@ -3,235 +3,291 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Breath of Stars</title>
+  <title>3D Molecular Control</title>
   <style>
-    body { 
-      margin: 0; background-color: #000; overflow: hidden; 
-      font-family: sans-serif; color: white; touch-action: none;
-    }
-    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-    video { display: none; }
+    body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+    canvas { display: block; width: 100vw; height: 100vh; }
     
     /* UI Overlay */
     #ui {
-      position: absolute; bottom: 30px; left: 0; width: 100%;
-      text-align: center; pointer-events: none; z-index: 10;
-      text-shadow: 0 0 5px black;
+      position: absolute; bottom: 40px; width: 100%; text-align: center;
+      color: rgba(255, 255, 255, 0.5); pointer-events: none;
+      z-index: 10; letter-spacing: 1px;
     }
-    h1 { font-size: 16px; margin: 0; letter-spacing: 2px; text-transform: uppercase; color: #aaa; }
-    #status { font-size: 24px; font-weight: bold; color: white; margin-top: 5px;}
+    #status { font-size: 1.2rem; font-weight: bold; color: white; margin-bottom: 5px; }
 
     /* Start Button */
     #start-screen {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9); z-index: 100;
+      background: rgba(0,0,0,0.95); z-index: 100;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: white;
     }
     button {
       padding: 15px 40px; font-size: 18px; background: white; color: black;
-      border: none; border-radius: 50px; cursor: pointer; font-weight: bold;
+      border: none; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 20px;
     }
   </style>
 </head>
 <body>
 
+  <!-- Start Screen -->
   <div id="start-screen">
-    <button id="start-btn">TAP TO START</button>
-    <p style="margin-top:10px; font-size:12px; color:#666">Allow Camera Access</p>
+    <h1 style="font-size:20px; text-transform:uppercase; letter-spacing:3px;">Molecular 3D</h1>
+    <p style="font-size:12px; color:#aaa">Control the sphere with your hand</p>
+    <button id="start-btn">INITIALIZE</button>
   </div>
 
+  <!-- Status UI -->
   <div id="ui">
-    <h1>Current State</h1>
     <div id="status">Waiting...</div>
+    <div style="font-size: 10px;">OPEN = Expand | FIST = Compress</div>
   </div>
-  
-  <video id="webcam" autoplay playsinline muted></video>
-  <canvas id="canvas"></canvas>
+
+  <!-- Start Three.js Scene -->
+  <div id="container"></div>
+
+  <!-- Imports -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0"
+      }
+    }
+  </script>
 
   <script type="module">
-    import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+    import * as THREE from 'three';
+    import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 
-    const video = document.getElementById('webcam');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const statusDiv = document.getElementById('status');
+    // --- VARIABLES ---
+    let camera, scene, renderer;
+    let particles, geometry, materials;
+    let originalPositions = []; // Store base shape
+    let count = 1500; // Particle count (Safe for iPhone)
+    
+    let handLandmarker = undefined;
+    let video = document.createElement('video');
+    
+    // Logic State
+    let targetExpansion = 1.0; // 1 = Normal, 3 = Big, 0.1 = Small
+    let currentExpansion = 1.0;
+    let gestureName = "NEUTRAL";
+
+    // UI
     const startBtn = document.getElementById('start-btn');
     const startScreen = document.getElementById('start-screen');
+    const statusDiv = document.getElementById('status');
 
-    let handLandmarker = undefined;
-    let particles = [];
-    let handX = 0, handY = 0;
-    let gestureState = "NONE"; // NONE, OPEN, CLOSED
+    // --- 1. THREE.JS SETUP ---
+    function initThree() {
+      const container = document.getElementById('container');
 
-    // --- 1. SETUP & CAMERA ---
-    async function setup() {
+      // Camera
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 400;
+
+      // Scene
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x000000, 0.002);
+
+      // Geometry: Create a Sphere of Points
+      geometry = new THREE.BufferGeometry();
+      const positions = [];
+      const colors = [];
+      const colorObj = new THREE.Color();
+
+      for (let i = 0; i < count; i++) {
+        // Random point inside a sphere logic
+        const r = 100 * Math.cbrt(Math.random()); // Radius ~100
+        const theta = Math.random() * 2 * Math.PI;
+        const phi = Math.acos(2 * Math.random() - 1);
+
+        const x = r * Math.sin(phi) * Math.cos(theta);
+        const y = r * Math.sin(phi) * Math.sin(theta);
+        const z = r * Math.cos(phi);
+
+        positions.push(x, y, z);
+        originalPositions.push({x, y, z}); // Save "Home" position
+
+        // Colors: Gold, Cyan, Pink Mix
+        if(Math.random() > 0.5) colorObj.setHex(0x00ffff); // Cyan
+        else if(Math.random() > 0.5) colorObj.setHex(0xff007f); // Pink
+        else colorObj.setHex(0xffd700); // Gold
+        
+        colors.push(colorObj.r, colorObj.g, colorObj.b);
+      }
+
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      // Material (Glowy Dots)
+      const material = new THREE.PointsMaterial({
+        size: 4,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.8
+      });
+
+      particles = new THREE.Points(geometry, material);
+      scene.add(particles);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      container.appendChild(renderer.domElement);
+
+      // Handle Resize
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- 2. MEDIAPIPE SETUP ---
+    async function setupMediaPipe() {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
       );
+      
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-          delegate: "CPU" // Use CPU for iPhone stability
+          delegate: "CPU" // CPU prevents GPU crashes on iOS Safari
         },
         runningMode: "VIDEO",
         numHands: 1
       });
-      startBtn.innerText = "START";
+      
+      startBtn.innerText = "START EXPERIENCE";
+      startBtn.disabled = false;
     }
 
+    // --- 3. START BUTTON ---
     startBtn.addEventListener('click', () => {
+      startBtn.innerText = "Accessing Camera...";
+      
       navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: "user", width: 640, height: 480 } 
       }).then((stream) => {
         video.srcObject = stream;
+        video.playsInline = true; // Important for iOS
+        video.autoplay = true;
         video.onloadeddata = () => {
-          startScreen.style.display = 'none';
-          initParticles();
-          loop();
+          startScreen.style.opacity = 0;
+          setTimeout(() => startScreen.style.display = 'none', 1000);
+          animate(); // Start Loop
         };
+      }).catch(err => {
+        alert("Camera failed: " + err);
       });
     });
 
-    // --- 2. LOGIC: FIST vs OPEN HAND ---
-    function detectState(landmarks) {
+    // --- 4. GESTURE LOGIC ---
+    function detectGesture(landmarks) {
       const wrist = landmarks[0];
-      const tips = [8, 12, 16, 20]; // Index, Middle, Ring, Pinky tips
-      const bases = [5, 9, 13, 17]; // Corresponding knuckles (MCP)
-
-      let extendedFingers = 0;
-
-      // Check each finger (excluding thumb for simplicity)
-      for (let i = 0; i < 4; i++) {
-        const tip = landmarks[tips[i]];
-        const base = landmarks[bases[i]];
-        
-        // Calculate distance from wrist
-        const tipDist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
-        const baseDist = Math.hypot(base.x - wrist.x, base.y - wrist.y);
-
-        // If tip is significantly further from wrist than the knuckle, it's open
-        if (tipDist > baseDist * 1.3) {
-          extendedFingers++;
-        }
+      const tips = [8, 12, 16, 20]; // Fingers
+      const bases = [5, 9, 13, 17]; // Knuckles
+      
+      let fingersOpen = 0;
+      for(let i=0; i<4; i++) {
+        // Distance check: Is tip further from wrist than knuckle?
+        const tipD = Math.hypot(landmarks[tips[i]].x - wrist.x, landmarks[tips[i]].y - wrist.y);
+        const baseD = Math.hypot(landmarks[bases[i]].x - wrist.x, landmarks[bases[i]].y - wrist.y);
+        if (tipD > baseD * 1.2) fingersOpen++;
       }
 
-      // Logic Thresholds
-      if (extendedFingers >= 3) return "OPEN";   // 3 or more fingers open
-      if (extendedFingers <= 1) return "CLOSED"; // 0 or 1 finger open (Fist)
-      return "NEUTRAL"; // In between
+      if (fingersOpen >= 3) return "OPEN";
+      if (fingersOpen <= 1) return "CLOSED";
+      return "NEUTRAL";
     }
 
-    // --- 3. PARTICLE SYSTEM ---
-    class Particle {
-      constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.vx = (Math.random() - 0.5) * 1;
-        this.vy = (Math.random() - 0.5) * 1;
-        this.size = Math.random() * 2 + 1;
-        this.color = `hsl(${Math.random() * 60 + 180}, 100%, 70%)`; // Cyan/Blue tones
-        this.friction = 0.96;
-      }
+    // --- 5. ANIMATION LOOP ---
+    let lastVideoTime = -1;
 
-      update() {
-        if (gestureState === "CLOSED") {
-          // --- ATTRACTION (Black Hole) ---
-          // Particles rush TOWARDS the hand
-          let dx = handX - this.x;
-          let dy = handY - this.y;
-          this.x += dx * 0.15; // Speed of attraction
-          this.y += dy * 0.15;
-          this.color = '#FFD700'; // Turn Gold
-          
-        } else if (gestureState === "OPEN") {
-          // --- REPULSION (Explosion) ---
-          // Particles rush AWAY from the hand
-          let dx = this.x - handX;
-          let dy = this.y - handY;
-          let dist = Math.sqrt(dx*dx + dy*dy);
-          
-          if (dist < 400) { // Interaction radius
-            let force = (400 - dist) / 400;
-            let angle = Math.atan2(dy, dx);
-            this.vx += Math.cos(angle) * force * 2;
-            this.vy += Math.sin(angle) * force * 2;
-            this.color = '#FF0055'; // Turn Pink/Red
-          }
-        } 
+    async function animate() {
+      requestAnimationFrame(animate);
 
-        // Apply Velocity & Friction
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vx *= this.friction;
-        this.vy *= this.friction;
-
-        // Keep bounds (wrap around screen)
-        if (this.x < 0) this.x = canvas.width;
-        if (this.x > canvas.width) this.x = 0;
-        if (this.y < 0) this.y = canvas.height;
-        if (this.y > canvas.height) this.y = 0;
-      }
-
-      draw() {
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    function initParticles() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      particles = [];
-      for(let i=0; i<400; i++) particles.push(new Particle());
-    }
-
-    // --- 4. ANIMATION LOOP ---
-    async function loop() {
-      // Clear with slight trail effect
-      ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Detect Hand
-      if (handLandmarker && video.videoWidth > 0) {
+      // A. Vision Detection
+      if (handLandmarker && video.currentTime !== lastVideoTime) {
+        lastVideoTime = video.currentTime;
         let now = performance.now();
         const result = handLandmarker.detectForVideo(video, now);
 
         if (result.landmarks && result.landmarks.length > 0) {
-          const lm = result.landmarks[0];
-          
-          // Get Palm Center (approximate between wrist and middle finger)
-          // Mirror X coordinate
-          handX = (1 - lm[9].x) * canvas.width; 
-          handY = lm[9].y * canvas.height;
+          const gesture = detectGesture(result.landmarks[0]);
+          gestureName = gesture;
 
-          // Determine State
-          gestureState = detectState(lm);
-          
-          // Update Text
-          if(gestureState === "OPEN") statusDiv.innerText = "OPEN 💥";
-          else if(gestureState === "CLOSED") statusDiv.innerText = "CLOSED ✊";
-          else statusDiv.innerText = "Hand Detected ✋";
-
+          if (gesture === "OPEN") {
+            targetExpansion = 2.5; // EXPAND (Explosion)
+            statusDiv.innerText = "EXPANDING ✨";
+            statusDiv.style.color = "#ff007f";
+          } else if (gesture === "CLOSED") {
+            targetExpansion = 0.1; // COMPRESS (Black Hole)
+            statusDiv.innerText = "COMPRESSING 🌑";
+            statusDiv.style.color = "#ffd700";
+          } else {
+            targetExpansion = 1.0; // NEUTRAL
+            statusDiv.innerText = "NEUTRAL ⚪";
+            statusDiv.style.color = "#ffffff";
+          }
         } else {
-          gestureState = "NONE";
-          statusDiv.innerText = "Show Hand...";
+          // No Hand
+          targetExpansion = 1.0;
+          statusDiv.innerText = "Waiting for hand...";
+          statusDiv.style.color = "#777";
         }
       }
 
-      // Update Particles
-      for (let p of particles) {
-        p.update();
-        p.draw();
-      }
+      // B. Smooth Physics (Lerp)
+      // Gradually move currentExpansion towards targetExpansion
+      currentExpansion += (targetExpansion - currentExpansion) * 0.05;
 
-      requestAnimationFrame(loop);
+      // C. Update Particles
+      const positions = particles.geometry.attributes.position.array;
+      const time = Date.now() * 0.001;
+
+      for (let i = 0; i < count; i++) {
+        const i3 = i * 3;
+        const orig = originalPositions[i];
+
+        // 1. Base Structure: Multiply Original Position by Expansion
+        let tx = orig.x * currentExpansion;
+        let ty = orig.y * currentExpansion;
+        let tz = orig.z * currentExpansion;
+
+        // 2. Add "Life": Gentle noise/wobble
+        // The wobble is faster if expanded (energetic)
+        const noiseAmt = (currentExpansion > 1.5) ? 5 : 2; 
+        tx += Math.sin(time + orig.y * 0.1) * noiseAmt;
+        ty += Math.cos(time + orig.x * 0.1) * noiseAmt;
+        tz += Math.sin(time + orig.z * 0.1) * noiseAmt;
+
+        positions[i3] = tx;
+        positions[i3 + 1] = ty;
+        positions[i3 + 2] = tz;
+      }
+      particles.geometry.attributes.position.needsUpdate = true;
+
+      // D. Rotate entire sphere slowly
+      particles.rotation.y += 0.002;
+      particles.rotation.x += 0.001;
+
+      renderer.render(scene, camera);
     }
 
     // Init
-    startBtn.innerText = "Loading AI...";
-    setup();
+    startBtn.disabled = true;
+    startBtn.innerText = "Loading 3D Engine...";
+    initThree();
+    setupMediaPipe();
 
   </script>
 </body>
