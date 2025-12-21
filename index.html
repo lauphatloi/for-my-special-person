@@ -265,7 +265,7 @@ I love you.
                     blending: THREE.AdditiveBlending,
                     depthWrite: false,
                     transparent: true,
-                    opacity: 1.0,
+                    opacity: 3.0,
                     sizeAttenuation: true
                 });
 
@@ -286,7 +286,7 @@ I love you.
         const galaxyParams = {
             totalCount: 15000, 
             radius: 70,       
-            minRadius: 18,    
+            minRadius: 22,    
             branches: 6,     
             spin: 1,
             randomness: 2.0, 
@@ -302,7 +302,7 @@ I love you.
             const randomX = Math.pow(Math.random(), galaxyParams.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * galaxyParams.randomness * radius;
             const randomZ = Math.pow(Math.random(), galaxyParams.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * galaxyParams.randomness * radius;
             
-            const randomY = (Math.random() - 0.5) * (radius * 0.2 + 5); 
+            const randomY = (Math.random() - 0.5) * (radius * 0.5 + 5); 
 
             const x = Math.cos(branchAngle + spinAngle) * radius + randomX;
             const z = Math.sin(branchAngle + spinAngle) * radius + randomZ;
@@ -397,7 +397,7 @@ I love you.
 
         const tick = () => {
             const elapsedTime = clock.getElapsedTime();
-            const dt = 0.015;
+            const dt = 0.0045;
             
             // --- BURST ANIMATION ---
             const introDuration = 3.0;
