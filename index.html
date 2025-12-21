@@ -3,48 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>3D Molecular Control</title>
+  <title>High Precision Finger Heart</title>
   <style>
-    body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+    body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     canvas { display: block; width: 100vw; height: 100vh; }
     
     /* UI Overlay */
     #ui {
-      position: absolute; bottom: 40px; width: 100%; text-align: center;
-      color: rgba(255, 255, 255, 0.5); pointer-events: none;
-      z-index: 10; letter-spacing: 1px;
+      position: absolute; bottom: 50px; width: 100%; text-align: center;
+      color: rgba(255, 255, 255, 0.8); pointer-events: none; z-index: 10;
     }
-    #status { font-size: 1.2rem; font-weight: bold; color: white; margin-bottom: 5px; }
+    #status { font-size: 2rem; font-weight: 800; color: white; margin-bottom: 5px; text-shadow: 0 0 15px rgba(255, 0, 127, 0.5); }
+    .sub { font-size: 0.9rem; letter-spacing: 1px; opacity: 0.7; }
 
-    /* Start Button */
+    /* Debug Panel - Helps you see what the AI sees */
+    #debug {
+      position: absolute; top: 10px; left: 10px; 
+      background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 8px;
+      color: #0f0; font-family: monospace; font-size: 10px; pointer-events: none;
+      z-index: 20; border: 1px solid #333;
+    }
+
     #start-screen {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.95); z-index: 100;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      color: white;
+      color: white; text-align: center;
     }
     button {
-      padding: 15px 40px; font-size: 18px; background: white; color: black;
-      border: none; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 20px;
+      padding: 15px 40px; font-size: 16px; background: #FF007F; color: white;
+      border: none; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 25px;
+      box-shadow: 0 0 20px rgba(255, 0, 127, 0.4); text-transform: uppercase; letter-spacing: 1px;
     }
   </style>
 </head>
 <body>
 
-  <!-- Start Screen -->
+  <div id="debug">Initializing AI...</div>
+
   <div id="start-screen">
-    <h1 style="font-size:20px; text-transform:uppercase; letter-spacing:3px;">Molecular 3D</h1>
-    <p style="font-size:12px; color:#aaa">Control the sphere with your hand</p>
-    <button id="start-btn">INITIALIZE</button>
+    <div style="font-size:50px; margin-bottom:10px">🫰</div>
+    <h1 style="letter-spacing: 2px; margin:0;">PRECISION MODE</h1>
+    <p style="font-size:13px; color:#aaa; max-width: 300px; line-height: 1.6; margin-top:15px;">
+      Using strict vector logic for detection.<br><br>
+      <b>1. Fold</b> middle/ring/pinky fingers.<br>
+      <b>2. Cross</b> thumb & index slightly.<br>
+    </p>
+    <button id="start-btn">START CAMERA</button>
   </div>
 
-  <!-- Status UI -->
   <div id="ui">
     <div id="status">Waiting...</div>
-    <div style="font-size: 10px;">OPEN = Expand | FIST = Compress</div>
+    <div class="sub">Make the gesture</div>
   </div>
 
-  <!-- Start Three.js Scene -->
   <div id="container"></div>
 
   <!-- Imports -->
@@ -62,233 +74,304 @@
     import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 
     // --- VARIABLES ---
-    let camera, scene, renderer;
-    let particles, geometry, materials;
-    let originalPositions = []; // Store base shape
-    let count = 1500; // Particle count (Safe for iPhone)
+    const PARTICLE_COUNT = 1500;
+    const SPHERE_RADIUS = 100;
+    const HEART_SCALE = 8;
     
+    let camera, scene, renderer, particles;
+    let spherePositions = [];
+    let heartPositions = [];
+    let currentPositions = [];
     let handLandmarker = undefined;
     let video = document.createElement('video');
+    let lastVideoTime = -1;
     
-    // Logic State
-    let targetExpansion = 1.0; // 1 = Normal, 3 = Big, 0.1 = Small
-    let currentExpansion = 1.0;
-    let gestureName = "NEUTRAL";
+    // Logic
+    let targetShape = "SPHERE"; 
+    let expansion = 1.0; 
+    let debugText = "";
 
-    // UI
+    // DOM
     const startBtn = document.getElementById('start-btn');
     const startScreen = document.getElementById('start-screen');
     const statusDiv = document.getElementById('status');
+    const debugDiv = document.getElementById('debug');
 
-    // --- 1. THREE.JS SETUP ---
+    // --- 1. GEOMETRY GENERATION ---
+    function getSpherePoint() {
+      const u = Math.random();
+      const v = Math.random();
+      const theta = 2 * Math.PI * u;
+      const phi = Math.acos(2 * v - 1);
+      const r = SPHERE_RADIUS * Math.cbrt(Math.random());
+      return { 
+        x: r * Math.sin(phi) * Math.cos(theta),
+        y: r * Math.sin(phi) * Math.sin(theta),
+        z: r * Math.cos(phi)
+      };
+    }
+
+    function getHeartPoint() {
+      let x, y, z;
+      while (true) {
+        x = (Math.random() * 4 - 2); 
+        y = (Math.random() * 4 - 2); 
+        z = (Math.random() * 4 - 2); 
+        const a = x*x + (9/4)*(y*y) + z*z - 1;
+        if ((a*a*a - x*x*z*z*z - (9/80)*y*y*z*z*z) < 0) break;
+      }
+      return { 
+        x: x * 30 * HEART_SCALE, 
+        y: y * 30 * HEART_SCALE + 25, 
+        z: z * 30 * HEART_SCALE 
+      };
+    }
+
+    function initShapes() {
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        spherePositions.push(getSpherePoint());
+        heartPositions.push(getHeartPoint());
+        currentPositions.push({ ...spherePositions[i] });
+      }
+    }
+
+    // --- 2. THREE.JS SCENE ---
     function initThree() {
       const container = document.getElementById('container');
-
-      // Camera
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.z = 400;
-
-      // Scene
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+      camera.position.z = 450;
       scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x000000, 0.002);
 
-      // Geometry: Create a Sphere of Points
-      geometry = new THREE.BufferGeometry();
-      const positions = [];
-      const colors = [];
-      const colorObj = new THREE.Color();
+      // Geometry
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(PARTICLE_COUNT * 3);
+      const colors = new Float32Array(PARTICLE_COUNT * 3);
+      const colorHeart = new THREE.Color(0xff0055); 
+      const colorSphere = new THREE.Color(0x00ffff);
 
-      for (let i = 0; i < count; i++) {
-        // Random point inside a sphere logic
-        const r = 100 * Math.cbrt(Math.random()); // Radius ~100
-        const theta = Math.random() * 2 * Math.PI;
-        const phi = Math.acos(2 * Math.random() - 1);
-
-        const x = r * Math.sin(phi) * Math.cos(theta);
-        const y = r * Math.sin(phi) * Math.sin(theta);
-        const z = r * Math.cos(phi);
-
-        positions.push(x, y, z);
-        originalPositions.push({x, y, z}); // Save "Home" position
-
-        // Colors: Gold, Cyan, Pink Mix
-        if(Math.random() > 0.5) colorObj.setHex(0x00ffff); // Cyan
-        else if(Math.random() > 0.5) colorObj.setHex(0xff007f); // Pink
-        else colorObj.setHex(0xffd700); // Gold
-        
-        colors.push(colorObj.r, colorObj.g, colorObj.b);
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        positions[i*3] = currentPositions[i].x;
+        positions[i*3+1] = currentPositions[i].y;
+        positions[i*3+2] = currentPositions[i].z;
+        colors[i*3] = colorSphere.r;
+        colors[i*3+1] = colorSphere.g;
+        colors[i*3+2] = colorSphere.b;
       }
 
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-      // Material (Glowy Dots)
+      // Texture for round particles
+      const canvas = document.createElement('canvas');
+      canvas.width = 32; canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,32,32);
+      const tex = new THREE.Texture(canvas);
+      tex.needsUpdate = true;
+
       const material = new THREE.PointsMaterial({
-        size: 4,
-        vertexColors: true,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        transparent: true,
-        opacity: 0.8
+        size: 8, vertexColors: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, transparent: true, opacity: 0.9, map: tex
       });
 
       particles = new THREE.Points(geometry, material);
       scene.add(particles);
 
-      // Renderer
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
       container.appendChild(renderer.domElement);
-
-      // Handle Resize
-      window.addEventListener('resize', onWindowResize);
     }
 
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+    // --- 3. HIGH PRECISION RECOGNITION ---
+    // This is the advanced logic you asked for
+    function analyzeHand(landmarks) {
+      const wrist = landmarks[0];
+      const thumbTip = landmarks[4];
+      const indexTip = landmarks[8];
+      const middleTip = landmarks[12];
+      const ringTip = landmarks[16];
+      const pinkyTip = landmarks[20];
+      
+      const indexMCP = landmarks[5]; // Index knuckle
+      const middleMCP = landmarks[9];
+      const ringMCP = landmarks[13];
+      const pinkyMCP = landmarks[17];
+
+      // 1. Calculate Distances relative to hand size
+      // We use (Wrist -> IndexMCP) as a reference unit for "1 hand scale"
+      const handSize = Math.hypot(indexMCP.x - wrist.x, indexMCP.y - wrist.y);
+      
+      // 2. CHECK: Are Middle, Ring, Pinky FOLDED?
+      // A finger is folded if the Tip is closer to the wrist than the MCP joint is to the wrist (roughly)
+      // Or simply: Distance(Tip, Wrist) < Distance(MCP, Wrist) + Buffer
+      const isFolded = (tip, mcp) => {
+        const dTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+        const dMcp = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
+        return dTip < dMcp * 1.2; // 1.2 allows for loose fist
+      };
+
+      const middleFolded = isFolded(middleTip, middleMCP);
+      const ringFolded = isFolded(ringTip, ringMCP);
+      const pinkyFolded = isFolded(pinkyTip, pinkyMCP);
+      
+      const fistBackground = middleFolded && ringFolded && pinkyFolded;
+
+      // 3. CHECK: PINCH (Thumb + Index)
+      const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+      // Normalized pinch distance (independent of how far you are from camera)
+      const normPinch = pinchDist / handSize; 
+      
+      // 4. CHECK: OPEN HAND
+      // If Pinky and Middle are FAR from wrist
+      const pinkyOpen = !pinkyFolded;
+      const middleOpen = !middleFolded;
+
+      // --- DEBUGGING DATA ---
+      debugText = `
+        Pinch: ${normPinch.toFixed(2)} (Req < 0.3)
+        Folded: M:${middleFolded} R:${ringFolded} P:${pinkyFolded}
+        FistBG: ${fistBackground}
+      `;
+      debugDiv.innerText = debugText;
+
+      // --- DECISION TREE ---
+      
+      // CASE A: FINGER HEART
+      // Rules: 
+      // 1. Pinch is close (< 0.35 scale)
+      // 2. Other fingers are mostly folded (Fist Background)
+      if (normPinch < 0.35 && fistBackground) {
+        return "HEART";
+      }
+
+      // CASE B: EXPLOSION (Open Hand)
+      // Rules:
+      // 1. Pinch is NOT happening (> 0.5)
+      // 2. Middle and Pinky are definitely open
+      if (normPinch > 0.5 && pinkyOpen && middleOpen) {
+        return "OPEN";
+      }
+
+      return "NEUTRAL";
     }
 
-    // --- 2. MEDIAPIPE SETUP ---
     async function setupMediaPipe() {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
       );
-      
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-          delegate: "CPU" // CPU prevents GPU crashes on iOS Safari
+          delegate: "CPU"
         },
         runningMode: "VIDEO",
         numHands: 1
       });
-      
-      startBtn.innerText = "START EXPERIENCE";
-      startBtn.disabled = false;
+      startBtn.innerText = "START MAGIC";
     }
 
-    // --- 3. START BUTTON ---
     startBtn.addEventListener('click', () => {
       startBtn.innerText = "Accessing Camera...";
-      
       navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: "user", width: 640, height: 480 } 
       }).then((stream) => {
         video.srcObject = stream;
-        video.playsInline = true; // Important for iOS
+        video.playsInline = true; 
         video.autoplay = true;
         video.onloadeddata = () => {
-          startScreen.style.opacity = 0;
-          setTimeout(() => startScreen.style.display = 'none', 1000);
-          animate(); // Start Loop
+          startScreen.style.display = 'none';
+          initShapes();
+          initThree();
+          loop();
         };
-      }).catch(err => {
-        alert("Camera failed: " + err);
       });
     });
 
-    // --- 4. GESTURE LOGIC ---
-    function detectGesture(landmarks) {
-      const wrist = landmarks[0];
-      const tips = [8, 12, 16, 20]; // Fingers
-      const bases = [5, 9, 13, 17]; // Knuckles
-      
-      let fingersOpen = 0;
-      for(let i=0; i<4; i++) {
-        // Distance check: Is tip further from wrist than knuckle?
-        const tipD = Math.hypot(landmarks[tips[i]].x - wrist.x, landmarks[tips[i]].y - wrist.y);
-        const baseD = Math.hypot(landmarks[bases[i]].x - wrist.x, landmarks[bases[i]].y - wrist.y);
-        if (tipD > baseD * 1.2) fingersOpen++;
-      }
+    // --- 4. LOOP ---
+    async function loop() {
+      requestAnimationFrame(loop);
 
-      if (fingersOpen >= 3) return "OPEN";
-      if (fingersOpen <= 1) return "CLOSED";
-      return "NEUTRAL";
-    }
-
-    // --- 5. ANIMATION LOOP ---
-    let lastVideoTime = -1;
-
-    async function animate() {
-      requestAnimationFrame(animate);
-
-      // A. Vision Detection
       if (handLandmarker && video.currentTime !== lastVideoTime) {
         lastVideoTime = video.currentTime;
-        let now = performance.now();
-        const result = handLandmarker.detectForVideo(video, now);
+        const result = handLandmarker.detectForVideo(video, performance.now());
 
         if (result.landmarks && result.landmarks.length > 0) {
-          const gesture = detectGesture(result.landmarks[0]);
-          gestureName = gesture;
-
-          if (gesture === "OPEN") {
-            targetExpansion = 2.5; // EXPAND (Explosion)
-            statusDiv.innerText = "EXPANDING ✨";
+          const gesture = analyzeHand(result.landmarks[0]);
+          
+          if (gesture === "HEART") {
+            targetShape = "HEART";
+            statusDiv.innerText = "FINGER HEART ❤️";
             statusDiv.style.color = "#ff007f";
-          } else if (gesture === "CLOSED") {
-            targetExpansion = 0.1; // COMPRESS (Black Hole)
-            statusDiv.innerText = "COMPRESSING 🌑";
-            statusDiv.style.color = "#ffd700";
+          } else if (gesture === "OPEN") {
+            targetShape = "SPHERE";
+            expansion = 3.0; // Explode
+            statusDiv.innerText = "OPEN ✨";
+            statusDiv.style.color = "#00ffff";
           } else {
-            targetExpansion = 1.0; // NEUTRAL
-            statusDiv.innerText = "NEUTRAL ⚪";
-            statusDiv.style.color = "#ffffff";
+            targetShape = "SPHERE";
+            expansion = 1.0;
+            statusDiv.innerText = "Ready...";
+            statusDiv.style.color = "white";
           }
         } else {
-          // No Hand
-          targetExpansion = 1.0;
-          statusDiv.innerText = "Waiting for hand...";
-          statusDiv.style.color = "#777";
+          statusDiv.innerText = "No Hand";
         }
       }
 
-      // B. Smooth Physics (Lerp)
-      // Gradually move currentExpansion towards targetExpansion
-      currentExpansion += (targetExpansion - currentExpansion) * 0.05;
-
-      // C. Update Particles
+      // Animation Physics
+      if (!particles) return;
       const positions = particles.geometry.attributes.position.array;
+      const colors = particles.geometry.attributes.color.array;
       const time = Date.now() * 0.001;
 
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
         const i3 = i * 3;
-        const orig = originalPositions[i];
+        let tx, ty, tz;
 
-        // 1. Base Structure: Multiply Original Position by Expansion
-        let tx = orig.x * currentExpansion;
-        let ty = orig.y * currentExpansion;
-        let tz = orig.z * currentExpansion;
+        if (targetShape === "HEART") {
+          tx = heartPositions[i].x;
+          ty = heartPositions[i].y;
+          tz = heartPositions[i].z;
+          // Pulse
+          const beat = 1 + Math.sin(time * 4) * 0.05;
+          tx *= beat; ty *= beat; tz *= beat;
+          
+          // Color Shift to RED
+          colors[i3] = 1.0; colors[i3+1] = 0.0; colors[i3+2] = 0.3; // Pinkish Red
 
-        // 2. Add "Life": Gentle noise/wobble
-        // The wobble is faster if expanded (energetic)
-        const noiseAmt = (currentExpansion > 1.5) ? 5 : 2; 
-        tx += Math.sin(time + orig.y * 0.1) * noiseAmt;
-        ty += Math.cos(time + orig.x * 0.1) * noiseAmt;
-        tz += Math.sin(time + orig.z * 0.1) * noiseAmt;
+        } else {
+          tx = spherePositions[i].x * expansion;
+          ty = spherePositions[i].y * expansion;
+          tz = spherePositions[i].z * expansion;
+          
+          // Color Shift to CYAN
+          colors[i3] = 0.0; colors[i3+1] = 1.0; colors[i3+2] = 1.0; 
+        }
 
-        positions[i3] = tx;
-        positions[i3 + 1] = ty;
-        positions[i3 + 2] = tz;
+        // Lerp Movement
+        currentPositions[i].x += (tx - currentPositions[i].x) * 0.1;
+        currentPositions[i].y += (ty - currentPositions[i].y) * 0.1;
+        currentPositions[i].z += (tz - currentPositions[i].z) * 0.1;
+
+        // Add Noise
+        const n = (targetShape === "HEART") ? 0.5 : 2.0;
+        positions[i3] = currentPositions[i].x + Math.sin(time * 2 + i)*n;
+        positions[i3+1] = currentPositions[i].y + Math.cos(time * 2 + i)*n;
+        positions[i3+2] = currentPositions[i].z;
       }
       particles.geometry.attributes.position.needsUpdate = true;
-
-      // D. Rotate entire sphere slowly
+      particles.geometry.attributes.color.needsUpdate = true;
       particles.rotation.y += 0.002;
-      particles.rotation.x += 0.001;
 
       renderer.render(scene, camera);
     }
 
-    // Init
-    startBtn.disabled = true;
-    startBtn.innerText = "Loading 3D Engine...";
-    initThree();
     setupMediaPipe();
-
   </script>
 </body>
 </html>
