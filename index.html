@@ -165,7 +165,7 @@
 <body>
 
     <!-- AUDIO -->
-    <audio id="bgMusic" loop>
+     <audio id="bgMusic" loop autoplay>
         <source src="back.mp3" type="audio/mpeg">
     </audio>
 
@@ -261,13 +261,28 @@ Goodnight, my universe. ❤️
 
 
         // --- SHARED AUDIO ---
+       // --- SHARED AUDIO ---
         const audio = document.getElementById("bgMusic");
-        audio.volume = 0.4;
+        audio.volume = 0.5; // Điều chỉnh âm lượng (0.0 đến 1.0)
+
         const playAudio = () => {
-            audio.play().catch(() => console.log("User interaction needed for audio"));
+            audio.play().then(() => {
+                document.removeEventListener('click', playAudio);
+                document.removeEventListener('scroll', playAudio);
+                document.removeEventListener('touchstart', playAudio);
+                document.removeEventListener('keydown', playAudio);
+                console.log("Audio started playing.");
+            }).catch(() => {
+                console.log("Autoplay blocked. Waiting for interaction.");
+            });
         };
-        document.body.addEventListener('click', playAudio, { once: true });
-        document.body.addEventListener('scroll', playAudio, { once: true });
+
+        playAudio();
+
+        document.addEventListener('click', playAudio);
+        document.addEventListener('scroll', playAudio);
+        document.addEventListener('touchstart', playAudio); // Dành cho điện thoại
+        document.addEventListener('keydown', playAudio);;
 
 
         // ==========================================
