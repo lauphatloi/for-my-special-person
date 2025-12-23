@@ -187,7 +187,7 @@
             <div style="font-size: 40px; margin-bottom: 10px;">✨</div>
             <h1 style="letter-spacing: 3px; text-transform: uppercase; margin:0;">Trước khi bắt đầu !</h1>
             <p style="font-size:13px; color:#aaa; max-width: 320px; line-height: 1.6; margin-top:15px;">
-                Đây là thư viện MediaPine của Google tui dùng để máy hiểu sự tương tác của bà với web - hoàn toàn k thể thu thập bất cứ dữ liệu nào của bà khi tắt web. Vì tui thấy cái này đang trend nên làm thử cho bà. Để nó hoạt động khi bà bấm nút thì bà hãy chấp nhận quyền truy cập camera nha!
+                Đây là thư viện MediaPine của Google tui dùng để máy hiểu sự tương tác của bà với web - hoàn toàn k thể thu thập bất cứ dữ liệu nào của bà khi tắt web. Vì tui thấy cái này đang trend nên làm thử cho bà. Để nó hoạt động khi bà bấm nút thì bà hãy chấp nhận quyền truy cập camera nha! <br>
               1. Hãy thử cười<br>
               2. Thử Bắn tim (xoay cổ tay nữa nha) <br>
               3. Và thử đưa tay lên mở tay ra
@@ -508,7 +508,7 @@ Goodnight, my universe. ❤️
         let part2Running = false;
         
         const initPart2 = () => {
-            const HER_PHRASES = ["Really?", "No way!", "Omg!", "So cute!", "Stop it!", "Haha!", "Magic!"];
+            const HER_PHRASES = ["dễ thương quá à !", "Mắc gì...", "Ư...", "Ê... !", "Thôi mà !", "ngon lắm á!", ];
             const PARTICLE_COUNT = 3000; const SPHERE_RADIUS = 200; const HEART_SCALE = 1.6; 
             
             let camera, scene, renderer, particles;
@@ -599,7 +599,7 @@ Goodnight, my universe. ❤️
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 handLandmarker = await HandLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "CPU" }, runningMode: "VIDEO", numHands: 1 });
                 faceLandmarker = await FaceLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "CPU" }, outputFaceBlendshapes: true, runningMode: "VIDEO", numFaces: 1 });
-                startBtn.innerText = "START MAGIC"; startBtn.disabled = false;
+                startBtn.innerText = "Thử nè Bà"; startBtn.disabled = false;
             }
 
             function detectFingerHeart(landmarks) {
@@ -661,8 +661,8 @@ Goodnight, my universe. ❤️
                     }
                 }
 
-                if (detectedGesture === "HEART") { targetShape = "HEART"; statusDiv.innerText = "❤️"; messageDiv.style.opacity = 1; messageDiv.style.transform = "translate(-50%, -50%) scale(1)"; if(isDefaultColors) statusDiv.style.color = "#ff007f"; }
-                else if (isSmiling) { targetShape = "SMILEY"; statusDiv.innerText = "😊"; messageDiv.style.opacity = 1; messageDiv.innerText = "You make me happy"; messageDiv.style.transform = "translate(-50%, -50%) scale(1)"; if(isDefaultColors) statusDiv.style.color = "#ffff00"; }
+                if (detectedGesture === "HEART") { targetShape = "HEART"; statusDiv.innerText = "Dấu tay bà hay làm mỗi khi chụp hình nè, khi bà thể hiện nó tui có thể thấy rất rõ cảm xúc vui vẻ lúc đó của bà !"; messageDiv.style.opacity = 1; messageDiv.style.transform = "translate(-50%, -50%) scale(1)"; if(isDefaultColors) statusDiv.style.color = "#ff007f"; }
+                else if (isSmiling) { targetShape = "SMILEY"; statusDiv.innerText = "Hãy quên đi những đêm buồn và vui vẻ lên nha !"; messageDiv.style.opacity = 1; messageDiv.innerText = "Xin cảm ơn nụ cười của bà !!"; messageDiv.style.transform = "translate(-50%, -50%) scale(1)"; if(isDefaultColors) statusDiv.style.color = "#ffff00"; }
                 else if (detectedGesture === "OPEN") { targetShape = "SPHERE"; expansion = 2.5; statusDiv.innerText = "✨"; messageDiv.style.opacity = 0; if (Date.now() - lastPhraseTime > 350) { spawnPhrase(); lastPhraseTime = Date.now(); } if(isDefaultColors) statusDiv.style.color = "#00ffff"; }
                 else { targetShape = "SPHERE"; expansion = 1.0; statusDiv.innerText = "Blink to change colors"; messageDiv.style.opacity = 0; if(isDefaultColors) statusDiv.style.color = "#ffffff"; }
 
