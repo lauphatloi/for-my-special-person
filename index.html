@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Magic Mirror: Blink Edition</title>
+  <title>Magic Mirror: Big Sphere</title>
   <style>
     body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', sans-serif; }
     canvas { display: block; width: 100vw; height: 100vh; }
@@ -81,7 +81,7 @@
     <p style="font-size:13px; color:#aaa; max-width: 320px; line-height: 1.6; margin-top:15px;">
       1. Smile :) = <span style="color:#ffff00; font-weight:bold;">Surprise</span><br>
       2. Finger Heart = <span style="color:#ff007f; font-weight:bold;">Love</span><br>
-      3. Blink 😑 = <span style="color:#00ff00; font-weight:bold;">Change Colors</span>
+      3. Blink 😑 = <span style="color:#00ff00; font-weight:bold;">Instant Color Change</span>
     </p>
     <button id="start-btn" disabled>LOADING AI...</button>
   </div>
@@ -111,11 +111,11 @@
     // ==========================================
     const HER_PHRASES = ["Really?", "No way!", "Omg!", "So cute!", "Stop it!", "Haha!", "Magic!"];
     const HEART_MESSAGE = "I LOVE YOU";
-    const SMILE_MESSAGE = "You make me happy"; // <--- CHANGE THIS
+    const SMILE_MESSAGE = "You make me happy"; 
 
     // --- CONFIGURATION ---
-    const PARTICLE_COUNT = 2800; 
-    const SPHERE_RADIUS = 120;
+    const PARTICLE_COUNT = 3000; 
+    const SPHERE_RADIUS = 200; 
     const HEART_SCALE = 1.6; 
     
     // --- VARIABLES ---
@@ -138,8 +138,9 @@
     // Blink & Color State
     let wasBlinking = false;
     let isDefaultColors = true;
-    let customColorPrimary = new THREE.Color(0xff0055); // Default Red
-    let customColorSecondary = new THREE.Color(0xffff00); // Default Yellow
+    let customColorPrimary = new THREE.Color(0xff0055); 
+    let customColorSecondary = new THREE.Color(0xffff00); 
+    let needImmediateColorUpdate = false; 
 
     // Eye Tracking
     let targetLookAt = { x: 0, y: 0 };
@@ -221,16 +222,14 @@
       }
     }
 
-    // --- 3. COLOR RANDOMIZER ---
+    // --- 3. COLOR LOGIC ---
     function triggerRandomColors() {
       isDefaultColors = false;
       const hue = Math.random();
-      // Generate two complementary vibrant colors
-      customColorPrimary.setHSL(hue, 1.0, 0.6); 
-      customColorSecondary.setHSL((hue + 0.5) % 1, 1.0, 0.6);
-      
-      // Visual feedback
-      statusDiv.innerText = "Colors Changed! 🎨";
+      customColorPrimary.setHSL(hue, 1.0, 0.7); 
+      customColorSecondary.setHSL((hue + 0.5) % 1, 1.0, 0.7);
+      needImmediateColorUpdate = true;
+      statusDiv.innerText = "COLORS CHANGED!";
       statusDiv.style.color = "#" + customColorPrimary.getHexString();
     }
 
@@ -239,7 +238,7 @@
       const container = document.getElementById('container');
       
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-      camera.position.z = 600; 
+      camera.position.z = 700; // <--- MOVED CAMERA BACK TO FIT LARGER SPHERE
 
       scene = new THREE.Scene();
       scene.fog = new THREE.FogExp2(0x000000, 0.001);
@@ -259,7 +258,7 @@
       geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
       const material = new THREE.PointsMaterial({
-        size: 6, vertexColors: true, blending: THREE.AdditiveBlending,
+        size: 6.5, vertexColors: true, blending: THREE.AdditiveBlending,
         depthWrite: false, transparent: true, opacity: 0.9,
         map: createCircleTexture()
       });
@@ -382,7 +381,6 @@
         lastVideoTime = video.currentTime;
         const now = performance.now();
 
-        // 1. Hand Detection
         if (handLandmarker) {
           const result = handLandmarker.detectForVideo(video, now);
           if (result.landmarks && result.landmarks.length > 0) {
@@ -390,40 +388,34 @@
           }
         }
 
-        // 2. Face Detection (Smile + Blink + Gaze)
         if (faceLandmarker) {
           const faceResult = faceLandmarker.detectForVideo(video, now);
           if (faceResult.faceBlendshapes && faceResult.faceBlendshapes.length > 0) {
             const categories = faceResult.faceBlendshapes[0].categories;
             
-            // Smile Logic
             const smileLeft = categories.find(c => c.categoryName === 'mouthSmileLeft')?.score || 0;
             const smileRight = categories.find(c => c.categoryName === 'mouthSmileRight')?.score || 0;
             if ((smileLeft + smileRight) / 2 > 0.45) isSmiling = true;
 
-            // Blink Logic
             const blinkLeft = categories.find(c => c.categoryName === 'eyeBlinkLeft')?.score || 0;
             const blinkRight = categories.find(c => c.categoryName === 'eyeBlinkRight')?.score || 0;
             const isBlinkingNow = (blinkLeft > 0.5 && blinkRight > 0.5);
 
-            // Trigger Color Change on Blink Start
             if (isBlinkingNow && !wasBlinking) {
                triggerRandomColors();
             }
             wasBlinking = isBlinkingNow;
           }
 
-          // Simple Gaze Tracking (Nose direction)
           if (faceResult.faceLandmarks && faceResult.faceLandmarks.length > 0) {
-             const nose = faceResult.faceLandmarks[0][1]; // Tip of nose
-             // Map 0..1 to Screen Coordinates (Inverted X for mirror feel)
+             const nose = faceResult.faceLandmarks[0][1]; 
              targetLookAt.x = (nose.x - 0.5) * -400; 
              targetLookAt.y = (nose.y - 0.5) * -400; 
           }
         }
       }
 
-      // B. STATE MANAGEMENT
+      // B. STATE
       if (detectedGesture === "HEART") {
         targetShape = "HEART";
         statusDiv.innerText = "❤️";
@@ -442,7 +434,7 @@
 
       } else if (detectedGesture === "OPEN") {
         targetShape = "SPHERE";
-        expansion = 3.0; 
+        expansion = 2.5; // Slightly reduced from 3.0 to prevent clipping
         statusDiv.innerText = "✨";
         if(isDefaultColors) statusDiv.style.color = "#00ffff";
         messageDiv.style.opacity = 0;
@@ -462,11 +454,12 @@
         messageDiv.style.transform = "translate(-50%, -50%) scale(0.5)";
       }
 
-      // C. PARTICLE ANIMATION
+      // C. PARTICLES
       if (!particles) return;
       const positions = particles.geometry.attributes.position.array;
       const colors = particles.geometry.attributes.color.array;
       const time = Date.now() * 0.001;
+      const colorLerpFactor = needImmediateColorUpdate ? 1.0 : 0.05;
 
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         const i3 = i * 3;
@@ -474,36 +467,31 @@
         let targetColor = { r:1, g:1, b:1 };
         let moveSpeed = 0.08;
 
-        // 1. Determine Position & Default Color
         if (targetShape === "HEART") {
           tx = heartPositions[i].x; ty = heartPositions[i].y; tz = heartPositions[i].z;
           const beat = Math.pow(Math.sin(time * 3), 2) * 0.05 + 0.95; 
           tx *= beat; ty *= beat; tz *= beat;
-          targetColor = { r:1, g:0, b:0.33 }; // Default Red
+          targetColor = { r:1, g:0, b:0.33 }; 
 
         } else if (targetShape === "SMILEY") {
           tx = smileyPositions[i].x; ty = smileyPositions[i].y; tz = smileyPositions[i].z;
-          targetColor = { r:1, g:1, b:0 }; // Default Yellow
-          moveSpeed = 0.2; // Snap fast
+          targetColor = { r:1, g:1, b:0 }; 
+          moveSpeed = 0.2; 
 
         } else {
           tx = spherePositions[i].x * expansion;
           ty = spherePositions[i].y * expansion;
           tz = spherePositions[i].z * expansion;
-          targetColor = (i%2==0) ? {r:0, g:1, b:1} : {r:1, g:1, b:1}; // Cyan/White
+          targetColor = (i%2==0) ? {r:0, g:1, b:1} : {r:1, g:1, b:1};
+          if(targetShape === "SPHERE" && expansion === 1.0) {
+             tx += targetLookAt.x * 0.5;
+             ty -= targetLookAt.y * 0.5;
+          }
         }
 
-        // 2. Apply Custom Colors (If Blinked)
         if (!isDefaultColors) {
           let c = (i % 2 === 0) ? customColorPrimary : customColorSecondary;
           targetColor = { r: c.r, g: c.g, b: c.b };
-        }
-
-        // 3. Movement Physics (with Eye Gaze Attraction)
-        // Add subtle pull towards where nose is pointing
-        if (targetShape === "SPHERE" && expansion === 1.0) {
-           tx += targetLookAt.x * 0.5; // Influence factor
-           ty -= targetLookAt.y * 0.5; // Invert Y
         }
 
         currentPositions[i].x += (tx - currentPositions[i].x) * moveSpeed;
@@ -515,12 +503,13 @@
         positions[i3 + 1] = currentPositions[i].y + Math.cos(time + i) * noise;
         positions[i3 + 2] = currentPositions[i].z;
 
-        // 4. Color Interpolation
-        colors[i3]   += (targetColor.r - colors[i3]) * 0.05;
-        colors[i3+1] += (targetColor.g - colors[i3+1]) * 0.05;
-        colors[i3+2] += (targetColor.b - colors[i3+2]) * 0.05;
+        colors[i3]   += (targetColor.r - colors[i3]) * colorLerpFactor;
+        colors[i3+1] += (targetColor.g - colors[i3+1]) * colorLerpFactor;
+        colors[i3+2] += (targetColor.b - colors[i3+2]) * colorLerpFactor;
       }
       
+      if (needImmediateColorUpdate) needImmediateColorUpdate = false;
+
       particles.geometry.attributes.position.needsUpdate = true;
       particles.geometry.attributes.color.needsUpdate = true;
       particles.rotation.y += 0.002;
