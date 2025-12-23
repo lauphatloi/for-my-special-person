@@ -663,8 +663,8 @@ Goodnight, my universe. ❤️
 
                 if (detectedGesture === "HEART") { targetShape = "HEART"; statusDiv.innerText = "Dấu tay bà hay làm mỗi khi chụp hình nè, khi bà thể hiện nó tui có thể thấy rất rõ cảm xúc vui vẻ lúc đó của bà !"; messageDiv.style.opacity = 1; messageDiv.style.transform = "translate(-50%, -50%) scale(1)"; if(isDefaultColors) statusDiv.style.color = "#ff007f"; }
                 else if (isSmiling) { targetShape = "SMILEY"; statusDiv.innerText = "Hãy quên đi những đêm buồn và vui vẻ lên nha !"; messageDiv.style.opacity = 1; messageDiv.innerText = "Xin cảm ơn nụ cười của bà !!"; messageDiv.style.transform = "translate(-50%, -50%) scale(1)"; if(isDefaultColors) statusDiv.style.color = "#ffff00"; }
-                else if (detectedGesture === "OPEN") { targetShape = "SPHERE"; expansion = 2.5; statusDiv.innerText = "✨"; messageDiv.style.opacity = 0; if (Date.now() - lastPhraseTime > 350) { spawnPhrase(); lastPhraseTime = Date.now(); } if(isDefaultColors) statusDiv.style.color = "#00ffff"; }
-                else { targetShape = "SPHERE"; expansion = 1.0; statusDiv.innerText = "Blink to change colors"; messageDiv.style.opacity = 0; if(isDefaultColors) statusDiv.style.color = "#ffffff"; }
+                else if (detectedGesture === "OPEN") { targetShape = "SPHERE"; expansion = 2.5; statusDiv.innerText = "Những câu bà hay nói nè - sai thì cho tui xin lỗi nha @@"; messageDiv.style.opacity = 0; if (Date.now() - lastPhraseTime > 350) { spawnPhrase(); lastPhraseTime = Date.now(); } if(isDefaultColors) statusDiv.style.color = "#00ffff"; }
+                else { targetShape = "SPHERE"; expansion = 1.0; statusDiv.innerText = "Chớp mắt là đổi màu ..."; messageDiv.style.opacity = 0; if(isDefaultColors) statusDiv.style.color = "#ffffff"; }
 
                 if (!particles) return;
                 const pos = particles.geometry.attributes.position.array;
