@@ -408,15 +408,27 @@ nhẹ nhàng hơn ...
             }
 
             function generateMemoryGalaxy() {
-                if(MEMORY_IMAGE_URLS.length > 0 && loadedPhotoTextures.length === 0) { setTimeout(generateMemoryGalaxy, 100); return; }
+                // CHANGE: Check if loaded textures are fewer than the URLs provided.
+                // This forces the code to wait until ALL images are ready.
+                if(MEMORY_IMAGE_URLS.length > 0 && loadedPhotoTextures.length < MEMORY_IMAGE_URLS.length) {
+                    console.log(`Loading images: ${loadedPhotoTextures.length} / ${MEMORY_IMAGE_URLS.length}`);
+                    setTimeout(generateMemoryGalaxy, 200); // Wait 200ms and check again
+                    return;
+                }
+
+                // If no photos loaded (or list is empty), use default diamond
                 const texturesToUse = loadedPhotoTextures.length > 0 ? loadedPhotoTextures : [createDiamondTexture()];
+                
+                // Calculate particles per texture based on how many actually loaded
                 const particlesPerTexture = Math.floor(galaxyParams.totalCount / texturesToUse.length);
+
                 texturesToUse.forEach((texture) => {
                     const geometry = new THREE.BufferGeometry();
                     const positions = new Float32Array(particlesPerTexture * 3);
                     const colors = new Float32Array(particlesPerTexture * 3);
                     const targets = new Float32Array(particlesPerTexture * 3);
                     const lifeParams = new Float32Array(particlesPerTexture * 2); 
+                    
                     for(let i=0; i<particlesPerTexture; i++) {
                         const i3 = i * 3; const i2 = i * 2;
                         const pos = getSpiralPosition();
@@ -428,14 +440,13 @@ nhẹ nhàng hơn ...
                     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
                     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
                     
-                    // --- CHANGED MATERIAL SETTINGS FOR NATURAL IMAGES ---
                     const material = new THREE.PointsMaterial({
                         size: 0.5, 
                         map: texture, 
                         depthWrite: false, 
-                        blending: THREE.NormalBlending, // Changed from Additive to Normal to stop glare
+                        blending: THREE.NormalBlending, 
                         transparent: true, 
-                        opacity: 1, // Slightly transparent to avoid harsh overlap
+                        opacity: 0.85, 
                         sizeAttenuation: true, 
                         vertexColors: true 
                     });
